@@ -39,7 +39,6 @@ static const char* TAG = "cpu_start";
  * The actual call flow will be to call esp_startup_start_app() in <ARCH>/port.c,
  * which will then call esp_startup_start_app_common()
  */
-
 // Duplicate of inaccessible xSchedulerRunning; needed at startup to avoid counting nesting
 volatile unsigned port_xSchedulerRunning[portNUM_PROCESSORS] = {0};
 
@@ -58,8 +57,6 @@ static void main_task(void* args);
 void esp_gdbstub_init(void);
 #endif // CONFIG_ESP_SYSTEM_GDBSTUB_RUNTIME
 
-extern void app_main(void);
-
 void esp_startup_start_app_common(void)
 {
 #if CONFIG_ESP_INT_WDT
@@ -74,18 +71,15 @@ void esp_startup_start_app_common(void)
     esp_gdbstub_init();
 #endif // CONFIG_ESP_SYSTEM_GDBSTUB_RUNTIME
 
-#ifdef CONFIG_IDF_RTOS_RTTHREAD
-    app_main();
-#else
+
     portBASE_TYPE res = xTaskCreatePinnedToCore(&main_task, "main",
                                                 ESP_TASK_MAIN_STACK, NULL,
                                                 ESP_TASK_MAIN_PRIO, NULL, ESP_TASK_MAIN_CORE);
     assert(res == pdTRUE);
     (void)res;
-#endif
 
 }
-
+extern void app_main(void);
 static void main_task(void* args)
 {
 #if !CONFIG_FREERTOS_UNICORE
@@ -94,7 +88,6 @@ static void main_task(void* args)
         ;
     }
 #endif
-
     // [refactor-todo] check if there is a way to move the following block to esp_system startup
     heap_caps_enable_nonos_stack_heaps();
 
@@ -116,6 +109,7 @@ static void main_task(void* args)
     ESP_ERROR_CHECK(esp_task_wdt_init(CONFIG_ESP_TASK_WDT_TIMEOUT_S, false));
 #endif
 
+#ifndef CONFIG_IDF_RTOS_RTTHREAD
     //Add IDLE 0 to task wdt
 #ifdef CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
     TaskHandle_t idle_0 = xTaskGetIdleTaskHandleForCPU(0);
@@ -130,13 +124,14 @@ static void main_task(void* args)
         ESP_ERROR_CHECK(esp_task_wdt_add(idle_1));
     }
 #endif
-
+#endif
     app_main();
     vTaskDelete(NULL);
+
 }
 
 // -------------------- Heap Related -----------------------
-
+#ifndef CONFIG_IDF_RTOS_RTTHREAD
 bool xPortCheckValidTCBMem(const void *ptr)
 {
     return esp_ptr_internal(ptr) && esp_ptr_byte_accessible(ptr);
@@ -201,3 +196,4 @@ void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
     *ppxTimerTaskStackBuffer = pxStackBufferTemp;
     *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
+#endif

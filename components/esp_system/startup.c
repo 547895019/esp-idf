@@ -285,14 +285,12 @@ static void do_core_init(void)
 #endif // defined(CONFIG_VFS_SUPPORT_IO) && !defined(CONFIG_ESP_CONSOLE_NONE)
 
     esp_err_t err __attribute__((unused));
-
     err = esp_pthread_init();
     assert(err == ESP_OK && "Failed to init pthread module!");
 
     spi_flash_init();
     /* init default OS-aware flash access critical section */
     spi_flash_guard_set(&g_flash_guard_default_ops);
-
     esp_flash_app_init();
     esp_err_t flash_ret = esp_flash_init_default_chip();
     assert(flash_ret == ESP_OK);
@@ -338,6 +336,11 @@ static void do_core_init(void)
     };
     err = esp_xt_wdt_init(&cfg);
     assert(err == ESP_OK && "Failed to init xtwdt");
+#endif
+
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+    extern void rtthread_startup(void);
+    rtthread_startup();
 #endif
 }
 
@@ -399,7 +402,7 @@ static void start_cpu0_default(void)
 
     // Initialize core components and services.
     do_core_init();
-
+    
     // Execute constructors.
     do_global_ctors();
 

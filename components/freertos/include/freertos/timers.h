@@ -75,7 +75,7 @@
  * (for example, xTimerStart(), xTimerReset(), etc.).
  */
 struct tmrTimerControl; /* The old naming convention is used to prevent breaking kernel aware debuggers. */
-#ifdef ESP_PLATFORM // IDF-3768
+#if defined(ESP_PLATFORM) || defined(CONFIG_IDF_RTOS_RTTHREAD) // IDF-3768
 typedef void* TimerHandle_t;
 #else
 typedef struct tmrTimerControl * TimerHandle_t;

@@ -15,8 +15,13 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ld")
 
 # Process the template file through the linker script generation mechanism, and use the output for linking the
 # final binary
+if(CONFIG_IDF_RTOS_RTTHREAD)
+target_linker_script(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_LIST_DIR}/${target}/sections.rtthread.ld.in"
+                    PROCESS "${CMAKE_CURRENT_BINARY_DIR}/ld/sections.ld")
+else()
 target_linker_script(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_LIST_DIR}/${target}/sections.ld.in"
                     PROCESS "${CMAKE_CURRENT_BINARY_DIR}/ld/sections.ld")
+endif()
 
 idf_build_get_property(config_dir CONFIG_DIR)
 # Preprocess memory.ld.in linker script to include configuration, becomes memory.ld
