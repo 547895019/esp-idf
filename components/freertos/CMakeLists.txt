@@ -27,7 +27,23 @@ if(CONFIG_IDF_TARGET_ARCH_XTENSA)
         port/xtensa
         port/priv_include
         .)
+elseif(CONFIG_IDF_RTOS_RTTHREAD)
+    set(srcs
+        "port/rtthread/port.c"
+        "port/rtthread/portasm.S")
 
+    set(include_dirs
+        include
+        include/esp_additions/freertos  # For files with #include "FreeRTOSConfig.h"
+        port/rtthread/include              # For including arch-specific FreeRTOSConfig_arch.h in port/<arch>/include
+        port/rtthread
+        include/esp_additions)          # For files with #include "freertos/FreeRTOSConfig.h"
+
+    set(private_include_dirs
+        port/rtthread/include/freertos
+        port/rtthread
+        port/priv_include
+        .)
 elseif(CONFIG_IDF_TARGET_ARCH_RISCV)
     set(srcs
         "port/riscv/port.c"
@@ -46,20 +62,31 @@ elseif(CONFIG_IDF_TARGET_ARCH_RISCV)
         .)
 
 endif()
-
 list(APPEND srcs
-    "esp_additions/task_snapshot.c"
     "port/port_common.c"
     "port/port_systick.c"
-    "croutine.c"
-    "event_groups.c"
     "list.c"
-    "queue.c"
-    "tasks.c"
-    "timers.c"
+    "croutine.c"
     "stream_buffer.c"
     "FreeRTOS-openocd.c"
     "freertos_v8_compat.c")
+    
+set(required_components app_trace esp_timer rtthread)
+if(CONFIG_IDF_RTOS_RTTHREAD)
+    list(APPEND srcs 
+    "port/rtthread/tasks.c" 
+    "port/rtthread/queue.c" 
+    "port/rtthread/event_groups.c" 
+    "port/rtthread/timers.c" 
+    "port/rtthread/freertos_internal.c") 
+else()
+    list(APPEND srcs 
+    "esp_additions/task_snapshot.c"
+    "tasks.c" 
+    "queue.c"
+    "event_groups.c"
+    "timers.c")
+endif()
 
 list(APPEND private_include_dirs
     "include/freertos")
@@ -71,14 +98,15 @@ endif()
 # esp_timer is required by FreeRTOS because we use esp_tiemr_get_time() to do profiling
 # app_trace is required by FreeRTOS headers only when CONFIG_APPTRACE_SV_ENABLE=y,
 # REQUIRES can't depend on config options, so always require it.
-set(required_components app_trace esp_timer)
+set(priv_requires soc esp_pm)
 
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS ${include_dirs}
                     PRIV_INCLUDE_DIRS  ${private_include_dirs}
                     LDFRAGMENTS linker.lf
                     REQUIRES ${required_components}
-                    PRIV_REQUIRES soc esp_pm)
+                    PRIV_REQUIRES ${priv_requires})
+
 
 idf_component_get_property(COMPONENT_DIR freertos COMPONENT_DIR)
 idf_component_set_property(freertos ORIG_INCLUDE_PATH "${COMPONENT_DIR}/include/freertos/")
@@ -96,7 +124,6 @@ set_source_files_properties(
     PROPERTIES COMPILE_DEFINITIONS
     _ESP_FREERTOS_INTERNAL
     )
-
 # The freertos component provides the `start_app` and `start_app_other_cores`
 # if it is included in the build. It then calls `app_main`
 # from the main task created, which must be provided by the user.

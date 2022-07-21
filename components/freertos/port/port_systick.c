@@ -74,25 +74,26 @@ void vPortSetupTimer(void)
     /* Systimer HAL layer object */
     static systimer_hal_context_t systimer_hal;
     /* set system timer interrupt vector */
-    ESP_ERROR_CHECK(esp_intr_alloc(ETS_SYSTIMER_TARGET0_EDGE_INTR_SOURCE + cpuid, ESP_INTR_FLAG_IRAM | level, SysTickIsrHandler, &systimer_hal, NULL));
+    uint8_t system_timer_counter = SYSTIMER_LL_COUNTER_OS_TICK;
+    ESP_ERROR_CHECK(esp_intr_alloc(ETS_SYSTIMER_TARGET1_EDGE_INTR_SOURCE + cpuid, ESP_INTR_FLAG_IRAM | level, SysTickIsrHandler, &systimer_hal, NULL));
 
     if (cpuid == 0) {
         systimer_hal_init(&systimer_hal);
-        systimer_ll_set_counter_value(systimer_hal.dev, SYSTIMER_LL_COUNTER_OS_TICK, 0);
-        systimer_ll_apply_counter_value(systimer_hal.dev, SYSTIMER_LL_COUNTER_OS_TICK);
+        systimer_ll_set_counter_value(systimer_hal.dev, system_timer_counter, 0);
+        systimer_ll_apply_counter_value(systimer_hal.dev, system_timer_counter);
 
         for (cpuid = 0; cpuid < SOC_CPU_CORES_NUM; cpuid++) {
-            systimer_hal_counter_can_stall_by_cpu(&systimer_hal, SYSTIMER_LL_COUNTER_OS_TICK, cpuid, false);
+            systimer_hal_counter_can_stall_by_cpu(&systimer_hal, system_timer_counter, cpuid, false);
         }
 
         for (cpuid = 0; cpuid < portNUM_PROCESSORS; ++cpuid) {
-            uint32_t alarm_id = SYSTIMER_LL_ALARM_OS_TICK_CORE0 + cpuid;
+            uint32_t alarm_id = 1 + SYSTIMER_LL_ALARM_OS_TICK_CORE0 + cpuid;
 
             /* configure the timer */
-            systimer_hal_connect_alarm_counter(&systimer_hal, alarm_id, SYSTIMER_LL_COUNTER_OS_TICK);
+            systimer_hal_connect_alarm_counter(&systimer_hal, alarm_id, system_timer_counter);
             systimer_hal_set_alarm_period(&systimer_hal, alarm_id, 1000000UL / CONFIG_FREERTOS_HZ);
             systimer_hal_select_alarm_mode(&systimer_hal, alarm_id, SYSTIMER_ALARM_MODE_PERIOD);
-            systimer_hal_counter_can_stall_by_cpu(&systimer_hal, SYSTIMER_LL_COUNTER_OS_TICK, cpuid, true);
+            systimer_hal_counter_can_stall_by_cpu(&systimer_hal, system_timer_counter, cpuid, true);
             if (cpuid == 0) {
                 systimer_hal_enable_alarm_int(&systimer_hal, alarm_id);
                 systimer_hal_enable_counter(&systimer_hal, SYSTIMER_LL_COUNTER_OS_TICK);
@@ -102,7 +103,8 @@ void vPortSetupTimer(void)
 #endif
             }
         }
-    } else {
+    } 
+    else {
         uint32_t alarm_id = SYSTIMER_LL_ALARM_OS_TICK_CORE0 + cpuid;
         systimer_hal_enable_alarm_int(&systimer_hal, alarm_id);
     }
@@ -116,15 +118,13 @@ void vPortSetupTimer(void)
  */
 IRAM_ATTR void SysTickIsrHandler(void *arg)
 {
-#ifdef CONFIG_IDF_RTOS_RTTHREAD
-#else
     uint32_t cpuid = xPortGetCoreID();
     systimer_hal_context_t *systimer_hal = (systimer_hal_context_t *)arg;
 #ifdef CONFIG_PM_TRACE
     ESP_PM_TRACE_ENTER(TICK, cpuid);
 #endif
 
-    uint32_t alarm_id = SYSTIMER_LL_ALARM_OS_TICK_CORE0 + cpuid;
+    uint32_t alarm_id = 1 + SYSTIMER_LL_ALARM_OS_TICK_CORE0 + cpuid;
     do {
         systimer_ll_clear_alarm_int(systimer_hal->dev, alarm_id);
 
@@ -145,7 +145,6 @@ IRAM_ATTR void SysTickIsrHandler(void *arg)
 
 #ifdef CONFIG_PM_TRACE
     ESP_PM_TRACE_EXIT(TICK, cpuid);
-#endif
 #endif
 }
 

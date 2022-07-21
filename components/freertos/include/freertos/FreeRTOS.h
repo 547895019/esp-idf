@@ -72,6 +72,9 @@
     #include <reent.h>
 #endif
 
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+#include "rtthread.h"
+#endif
 /*
  * Check all the required application specific macros have been defined.
  * These macros are application specific and (as downloaded) are defined
@@ -1202,6 +1205,21 @@ typedef struct xSTATIC_LIST
  * are set.  Its contents are somewhat obfuscated in the hope users will
  * recognise that it would be unwise to make direct use of the structure members.
  */
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+typedef struct xSTATIC_TCB
+{
+    struct rt_thread thread;
+    #if ( configUSE_TASK_NOTIFICATIONS == 1 )
+    void * ulNotified[configTASK_NOTIFICATION_ARRAY_ENTRIES];      
+    #endif
+    #if ( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
+        uint8_t ucStaticallyAllocated; /*< Set to pdTRUE if the event group is statically allocated to ensure no attempt is made to free the memory. */
+    #endif
+    #if ( configUSE_TRACE_FACILITY == 1 )
+        UBaseType_t uxTaskNumber; /*< Stores a number specifically for use by third party trace code. */
+    #endif
+}StaticTask_t;
+#else
 typedef struct xSTATIC_TCB
 {
     void * pxDummy1;
@@ -1255,7 +1273,7 @@ typedef struct xSTATIC_TCB
         int iDummy22;
     #endif
 } StaticTask_t;
-
+#endif
 /*
  * In line with software engineering best practice, especially when supplying a
  * library that is likely to change in future versions, FreeRTOS implements a
@@ -1270,6 +1288,25 @@ typedef struct xSTATIC_TCB
  * users will recognise that it would be unwise to make direct use of the
  * structure members.
  */
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+typedef struct xSTATIC_QUEUE
+{
+    union
+    {
+        struct rt_mutex xMutex;
+        struct rt_semaphore  xSem;     /*< Data required exclusively when this structure is used as a queue. */
+        struct rt_messagequeue  xMq; /*< Data required exclusively when this structure is used as a semaphore. */
+    } u;
+    uint8_t ucQueueType;
+    #if ( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
+        uint8_t ucStaticallyAllocated; /*< Set to pdTRUE if the event group is statically allocated to ensure no attempt is made to free the memory. */
+    #endif
+    #if ( configUSE_TRACE_FACILITY == 1 )
+        UBaseType_t uxQueueNumber;
+    #endif
+}StaticQueue_t;
+typedef StaticQueue_t StaticSemaphore_t;
+#else
 typedef struct xSTATIC_QUEUE
 {
     void * pvDummy1[ 3 ];
@@ -1299,7 +1336,7 @@ typedef struct xSTATIC_QUEUE
     portMUX_TYPE xDummy10;
 } StaticQueue_t;
 typedef StaticQueue_t StaticSemaphore_t;
-
+#endif
 /*
  * In line with software engineering best practice, especially when supplying a
  * library that is likely to change in future versions, FreeRTOS implements a
@@ -1314,6 +1351,21 @@ typedef StaticQueue_t StaticSemaphore_t;
  * obfuscated in the hope users will recognise that it would be unwise to make
  * direct use of the structure members.
  */
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+typedef struct xSTATIC_EVENT_GROUP
+{
+    struct rt_event xEvent;
+
+    #if ( configUSE_TRACE_FACILITY == 1 )
+        UBaseType_t uxEventGroupNumber;
+    #endif
+
+    #if ( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
+        uint8_t ucStaticallyAllocated; /*< Set to pdTRUE if the event group is statically allocated to ensure no attempt is made to free the memory. */
+    #endif
+
+} StaticEventGroup_t;
+#else
 typedef struct xSTATIC_EVENT_GROUP
 {
     TickType_t xDummy1;
@@ -1328,7 +1380,7 @@ typedef struct xSTATIC_EVENT_GROUP
     #endif
     portMUX_TYPE xDummy5;
 } StaticEventGroup_t;
-
+#endif
 /*
  * In line with software engineering best practice, especially when supplying a
  * library that is likely to change in future versions, FreeRTOS implements a
@@ -1343,6 +1395,20 @@ typedef struct xSTATIC_EVENT_GROUP
  * the hope users will recognise that it would be unwise to make direct use of
  * the structure members.
  */
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+/* The definition of the timers themselves. */
+typedef struct xSTATIC_TIMER                  /* The old naming convention is used to prevent breaking kernel aware debuggers. */
+{
+    struct rt_timer xTimer;                
+    void * pvTimerID;                           /*<< An ID to identify the timer.  This allows the timer to be identified when the same callback is used for multiple timers. */
+    #if ( configUSE_TRACE_FACILITY == 1 )
+        UBaseType_t uxTimerNumber;              /*<< An ID assigned by trace tools such as FreeRTOS+Trace */
+    #endif
+    #if ( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
+        uint8_t ucStaticallyAllocated; /*< Set to pdTRUE if the event group is statically allocated to ensure no attempt is made to free the memory. */
+    #endif
+} StaticTimer_t;
+#else
 typedef struct xSTATIC_TIMER
 {
     void * pvDummy1;
@@ -1355,7 +1421,7 @@ typedef struct xSTATIC_TIMER
     #endif
     uint8_t ucDummy8;
 } StaticTimer_t;
-
+#endif
 /*
  * In line with software engineering best practice, especially when supplying a
  * library that is likely to change in future versions, FreeRTOS implements a

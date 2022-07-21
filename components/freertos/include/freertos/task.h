@@ -82,7 +82,7 @@
  * \ingroup Tasks
  */
 struct tskTaskControlBlock;     /* The old naming convention is used to prevent breaking kernel aware debuggers. */
-#ifdef ESP_PLATFORM // IDF-3769
+#if defined(ESP_PLATFORM) || defined(CONFIG_IDF_RTOS_RTTHREAD) // IDF-3769
 typedef void* TaskHandle_t;
 #else
 typedef struct tskTaskControlBlock* TaskHandle_t;

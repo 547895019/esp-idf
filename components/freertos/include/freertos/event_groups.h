@@ -84,7 +84,7 @@
  * \ingroup EventGroup
  */
 struct EventGroupDef_t;
-#ifdef ESP_PLATFORM // IDF-3770
+#if defined(ESP_PLATFORM) || defined(CONFIG_IDF_RTOS_RTTHREAD) // IDF-3770
 typedef void * EventGroupHandle_t;
 #else
 typedef struct EventGroupDef_t * EventGroupHandle_t;

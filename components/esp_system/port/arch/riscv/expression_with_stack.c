@@ -18,6 +18,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+void esp_execute_shared_stack_function(SemaphoreHandle_t lock, void *stack, size_t stack_size, shared_stack_function function)
+{
+    printf("esp_execute_shared_stack_function no support!\n");
+}
+#else
 static portMUX_TYPE shared_stack_spinlock = portMUX_INITIALIZER_UNLOCKED;
 static void *current_task_stack = NULL;
 
@@ -30,10 +36,10 @@ static StackType_t *esp_switch_stack_setup(StackType_t *stack, size_t stack_size
     memset(stack, 0xa5U, stack_size * sizeof(StackType_t));
 
     StaticTask_t *current = (StaticTask_t *)xTaskGetCurrentTaskHandle();
+    
     //Then put the fake stack inside of TCB:
     current_task_stack = current->pxDummy6;
     current->pxDummy6 = (void *)stack;
-
     StackType_t *top_of_stack = stack + stack_size;
 
     //Align stack to a 16byte boundary, as required by CPU specific:
@@ -63,11 +69,11 @@ void esp_execute_shared_stack_function(SemaphoreHandle_t lock, void *stack, size
 
     portENTER_CRITICAL(&shared_stack_spinlock);
     StaticTask_t *current = (StaticTask_t *)xTaskGetCurrentTaskHandle();
-
     //Restore current task stack:
     current->pxDummy6 = (StackType_t *)current_task_stack;
-    vPortSetStackWatchpoint(current->pxDummy6);
+    vPortSetStackWatchpoint((StackType_t *)current_task_stack);
     portEXIT_CRITICAL(&shared_stack_spinlock);
 
     xSemaphoreGive(lock);
 }
+#endif

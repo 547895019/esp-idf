@@ -279,12 +279,21 @@ void IRAM_ATTR call_start_cpu0(void)
     // Configure the global pointer register
     // (This should be the first thing IDF app does, as any other piece of code could be
     // relaxed by the linker to access something relative to __global_pointer$)
+#ifdef CONFIG_IDF_RTOS_RTTHREAD
+    __asm__ __volatile__ (
+        ".option push\n"
+        ".option norelax\n"
+        "la gp, __stack_start__\n"
+        ".option pop"
+    );
+#else
     __asm__ __volatile__ (
         ".option push\n"
         ".option norelax\n"
         "la gp, __global_pointer$\n"
         ".option pop"
     );
+#endif
 #endif
 
     // Move exception vectors to IRAM
