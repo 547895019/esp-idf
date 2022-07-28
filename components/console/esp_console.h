@@ -26,6 +26,13 @@ typedef struct {
     int hint_bold;              //!< Set to 1 to print hint text in bold
 } esp_console_config_t;
 
+#define ESP_CONSOLE_INIT_ARGS_FN(f, h, a,af,...) \
+static int  __attribute__((used)) __VA_ARGS__ __esp_console_init_fn_##f(int argc, char **argv); \
+static const __attribute__((used)) esp_console_cmd_t _SECTION_ATTR_IMPL(".esp_console_init_fn", f) \
+                    esp_console_init_fn_##f = { .command = #f, .func = &__esp_console_init_fn_##f, .help = (h), .hint = NULL, .argtable = (a), .argtable_init = (af)}; \
+static int __attribute__((used)) __VA_ARGS__ __esp_console_init_fn_##f(int argc, char **argv)
+
+#define ESP_CONSOLE_INIT_FN(f, h,...) ESP_CONSOLE_INIT_ARGS_FN(f,h,NULL,NULL)
 /**
  * @brief Default console configuration value
  *
@@ -151,7 +158,7 @@ esp_err_t esp_console_deinit(void);
  * @return console command return code, 0 indicates "success"
  */
 typedef int (*esp_console_cmd_func_t)(int argc, char **argv);
-
+typedef void (*esp_console_argtable_func_t)(void);
 /**
  * @brief Console command description
  */
@@ -184,6 +191,7 @@ typedef struct {
      * Only used for the duration of esp_console_cmd_register call.
      */
     void *argtable;
+    esp_console_argtable_func_t  argtable_init;
 } esp_console_cmd_t;
 
 /**

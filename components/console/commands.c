@@ -105,6 +105,9 @@ esp_err_t esp_console_cmd_register(const esp_console_cmd_t *cmd)
     }
     item->command = cmd->command;
     item->help = cmd->help;
+    if (cmd->argtable_init) {
+        cmd->argtable_init();
+    }
     if (cmd->hint) {
         /* Prepend a space before the hint. It separates command name and
          * the hint. arg_print_syntax below adds this space as well.
@@ -122,6 +125,7 @@ esp_err_t esp_console_cmd_register(const esp_console_cmd_t *cmd)
         }
         item->hint = buf;
     }
+    
     item->argtable = cmd->argtable;
     item->func = cmd->func;
     cmd_item_t *last = SLIST_FIRST(&s_cmd_list);
@@ -238,8 +242,22 @@ static int help_command(int argc, char **argv)
     return 0;
 }
 
+static void do_console_init_fn(void)
+{
+    extern esp_console_cmd_t _esp_console_init_fn_array_start;
+    extern esp_console_cmd_t _esp_console_init_fn_array_end;
+
+    esp_console_cmd_t *p;
+
+    for (p = &_esp_console_init_fn_array_end - 1; p >= &_esp_console_init_fn_array_start; --p) {
+        ESP_ERROR_CHECK( esp_console_cmd_register(p) );
+    }
+}
+
+
 esp_err_t esp_console_register_help_command(void)
 {
+    do_console_init_fn();
     esp_console_cmd_t command = {
         .command = "help",
         .help = "Print the list of registered commands",

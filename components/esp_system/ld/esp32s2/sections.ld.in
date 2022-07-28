@@ -308,6 +308,11 @@ SECTIONS
     __init_array_start = ABSOLUTE(.);
     KEEP (*(EXCLUDE_FILE (*crtend.* *crtbegin.*) .ctors SORT(.ctors.*)))
     __init_array_end = ABSOLUTE(.);
+    
+    _esp_console_init_fn_array_start = ABSOLUTE(.);
+    KEEP (*(SORT(.esp_console_init_fn) SORT(.esp_console_init_fn.*)))
+    _esp_console_init_fn_array_end = ABSOLUTE(.);
+    
     KEEP (*crtbegin.*(.dtors))
     KEEP (*(EXCLUDE_FILE (*crtend.*) .dtors))
     KEEP (*(SORT(.dtors.*)))
