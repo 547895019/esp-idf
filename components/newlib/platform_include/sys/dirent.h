@@ -28,6 +28,7 @@ extern "C" {
 typedef struct {
     uint16_t dd_vfs_idx; /*!< VFS index, not to be used by applications */
     uint16_t dd_rsv;     /*!< field reserved for future extension */
+    void *rsv;
     /* remaining fields are defined by VFS implementation */
 } DIR;
 

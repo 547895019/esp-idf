@@ -388,6 +388,7 @@ esp_err_t esp_console_new_repl_usb_serial_jtag(const esp_console_dev_usb_serial_
  *      - ESP_ERR_INVALID_STATE, if repl has started already
  */
 esp_err_t esp_console_start_repl(esp_console_repl_t *repl);
+esp_err_t esp_console_delete_repl(esp_console_repl_t *repl);
 
 #ifdef __cplusplus
 }

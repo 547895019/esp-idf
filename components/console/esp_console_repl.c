@@ -290,7 +290,16 @@ _exit:
     }
     return ret;
 }
-
+esp_err_t esp_console_delete_repl(esp_console_repl_t *repl)
+{
+    esp_console_repl_com_t *repl_com = __containerof(repl, esp_console_repl_com_t, repl_core);
+    if(repl_com){
+        if(repl_com->repl_core.del){
+            repl_com->repl_core.del(repl);
+        }
+    }
+    return ESP_OK;
+}
 esp_err_t esp_console_start_repl(esp_console_repl_t *repl)
 {
     esp_err_t ret = ESP_OK;

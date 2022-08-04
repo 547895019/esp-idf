@@ -312,7 +312,32 @@ SECTIONS
     _esp_console_init_fn_array_start = ABSOLUTE(.);
     KEEP (*(SORT(.esp_console_init_fn) SORT(.esp_console_init_fn.*)))
     _esp_console_init_fn_array_end = ABSOLUTE(.);
-    
+
+    /* section information for shell shell */
+    __fsymtab_start = .;
+    KEEP(*(FSymTab))
+    __fsymtab_end = .;
+
+    /* section information for OneOS drivers */
+    __os_init_start = ABSOLUTE(.);
+    KEEP(*(SORT(.init_call*)))
+    __os_init_end = ABSOLUTE(.);
+
+    /* section information for OneOS drivers */
+    __driver_table_start = .;
+    KEEP(*(driver_table))
+    __driver_table_end = .;
+
+    /* section information for OneOS devices */
+    __device_table_start = .;
+    KEEP(*(device_table))
+    __device_table_end = .;
+
+    /* section information for modules */
+    __osmsymtab_start = .;
+    KEEP(*(MSymTab))
+    __osmsymtab_end = .;
+
     KEEP (*crtbegin.*(.dtors))
     KEEP (*(EXCLUDE_FILE (*crtend.*) .dtors))
     KEEP (*(SORT(.dtors.*)))
