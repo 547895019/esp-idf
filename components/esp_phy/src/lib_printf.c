@@ -44,11 +44,12 @@ static int lib_printf(const char* tag, const char* format, va_list arg)
 
 int phy_printf(const char* format, ...)
 {
-    va_list arg;
-    va_start(arg, format);
-    int res = lib_printf("phy", format, arg);
-    va_end(arg);
-    return res;
+    //va_list arg;
+    //va_start(arg, format);
+    //int res = lib_printf("phy", format, arg);
+    //va_end(arg);
+    //return res;
+    return 0;
 }
 
 
