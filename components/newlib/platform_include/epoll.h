@@ -1,4 +1,4 @@
-// Copyright 2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#ifndef _ESP_SYS_UNISTD_H
-#define _ESP_SYS_UNISTD_H
+#ifndef _ESP_EPOLL_H
+#define _ESP_EPOLL_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include_next <epoll.h>
 
-#include_next <sys/unistd.h>
-
-int truncate(const char *, off_t __length);
-int gethostname(char *__name, size_t __len);
-int getentropy(void *buffer, size_t length);
 #ifdef __cplusplus
-}
+} // extern "C"
 #endif
-#endif /* _SYS_UNISTD_H */
+
+#endif

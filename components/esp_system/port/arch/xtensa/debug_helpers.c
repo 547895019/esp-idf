@@ -41,6 +41,29 @@ bool IRAM_ATTR esp_backtrace_get_next_frame(esp_backtrace_frame_t *frame)
     return (esp_stack_ptr_is_sane(frame->sp) && esp_ptr_executable((void*)esp_cpu_process_stack_pc(frame->pc)));
 }
 
+/**
+ * @brief When one step of the backtrace is generated, output it to the serial.
+ * This function can be overriden as it is defined as weak.
+ *
+ * @param pc Program counter of the backtrace step.
+ * @param sp Stack pointer of the backtrace step.
+ */
+void __attribute__((weak)) esp_backtrace_user_print_entry(uint32_t pc, uint32_t sp)
+{
+
+}
+
+void __attribute__((weak)) esp_backtrace_user_print_entry_start(void)
+{
+
+}
+
+void __attribute__((weak)) esp_backtrace_user_print_entry_end(void)
+{
+
+}
+
+
 static void IRAM_ATTR print_entry(uint32_t pc, uint32_t sp, bool panic)
 {
     if (panic) {
@@ -51,6 +74,7 @@ static void IRAM_ATTR print_entry(uint32_t pc, uint32_t sp, bool panic)
     } else {
         esp_rom_printf("0x%08X:0x%08X", pc, sp);
     }
+    esp_backtrace_user_print_entry(pc, sp);
 }
 
 static void IRAM_ATTR print_str(const char* str, bool panic)
@@ -69,6 +93,8 @@ esp_err_t IRAM_ATTR esp_backtrace_print_from_frame(int depth, const esp_backtrac
         return ESP_ERR_INVALID_ARG;
     }
 
+    esp_backtrace_user_print_entry_start();
+    
     //Initialize stk_frame with first frame of stack
     esp_backtrace_frame_t stk_frame = { 0 };
     memcpy(&stk_frame, frame, sizeof(esp_backtrace_frame_t));
@@ -99,7 +125,9 @@ esp_err_t IRAM_ATTR esp_backtrace_print_from_frame(int depth, const esp_backtrac
     } else if (stk_frame.next_pc != 0) {    //Backtrace continues
         print_str(" |<-CONTINUES", panic);
     }
+
     print_str("\r\n\r\n", panic);
+    esp_backtrace_user_print_entry_end();
     return ret;
 }
 

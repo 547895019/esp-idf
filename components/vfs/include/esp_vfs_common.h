@@ -22,6 +22,7 @@ extern "C" {
  * @brief Line ending settings
  */
 typedef enum {
+    ESP_LINE_ENDINGS_NONE,
     ESP_LINE_ENDINGS_CRLF,//!< CR + LF
     ESP_LINE_ENDINGS_CR,  //!< CR
     ESP_LINE_ENDINGS_LF,  //!< LF

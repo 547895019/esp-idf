@@ -675,7 +675,7 @@ void nvs_entry_info(nvs_iterator_t iterator, nvs_entry_info_t *out_info);
  */
 void nvs_release_iterator(nvs_iterator_t iterator);
 
-
+extern esp_err_t esp_console_register_nvs_command(void);
 #ifdef __cplusplus
 } // extern "C"
 #endif

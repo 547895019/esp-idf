@@ -11,7 +11,7 @@
 #include "sdkconfig.h"
 
 // Application version info
-const __attribute__((section(".rodata_desc"))) esp_app_desc_t esp_app_desc = {
+const __attribute__((__weak__)) __attribute__((section(".rodata_desc"))) esp_app_desc_t esp_app_desc = {
     .magic_word = ESP_APP_DESC_MAGIC_WORD,
 #ifdef CONFIG_APP_EXCLUDE_PROJECT_VER_VAR
     .version = "",

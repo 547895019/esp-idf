@@ -19,15 +19,94 @@
 #include "esp_core_dump_types.h"
 #include "esp_core_dump_port.h"
 #include "esp_core_dump_common.h"
+#include "esp_partition.h"
+#include "esp_flash_internal.h"
+#include "esp_flash_encrypt.h"
 #include "esp_rom_sys.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 const static DRAM_ATTR char TAG[] __attribute__((unused)) = "esp_core_dump_uart";
 
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_UART
 
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+static DRAM_ATTR uint32_t wr_flash_off = 0;
+
+#ifndef CONFIG_SPI_FLASH_USE_LEGACY_IMPL
+#define ESP_COREDUMP_FLASH_WRITE(_off_, _data_, _len_)           spi_flash_write(_off_, _data_, _len_)
+#define ESP_COREDUMP_FLASH_WRITE_ENCRYPTED(_off_, _data_, _len_) spi_flash_write_encrypted(_off_, _data_, _len_)
+#define ESP_COREDUMP_FLASH_ERASE(_off_, _len_)                   spi_flash_erase_range(_off_, _len_)
+#define ESP_COREDUMP_FLASH_READ(_off_, _data_,_len_)             spi_flash_read(_off_, _data_, _len_)
+#else
+#define ESP_COREDUMP_FLASH_WRITE(_off_, _data_, _len_)           esp_flash_write(esp_flash_default_chip, _data_, _off_, _len_)
+#define ESP_COREDUMP_FLASH_WRITE_ENCRYPTED(_off_, _data_, _len_) esp_flash_write_encrypted(esp_flash_default_chip, _off_, _data_, _len_)
+#define ESP_COREDUMP_FLASH_ERASE(_off_, _len_)                   esp_flash_erase_region(esp_flash_default_chip, _off_, _len_)
+#define ESP_COREDUMP_FLASH_READ(_off_, _data_,_len_)             esp_flash_write(esp_flash_default_chip, _data_, _off_, _len_)
+#endif
+#endif
+
+
 /* This function exists on every board, thus, we don't need to specify
  * explicitly the header for each board. */
 int esp_clk_cpu_freq(void);
+
+#if CONFIG_ESP_COREDUMP_UART_TO_FILE
+static int backtrace_fd = -1;
+static int corefd = -1;
+
+static void save_corefile(uint8_t *data, int len)
+{
+    if(corefd != -1){
+        write(corefd, data, len);
+        write(corefd,"\r\n", strlen("\r\n"));
+    }
+}
+
+static char * core_file_path()
+{
+    int fd;
+    static char path[32];
+
+    for (int i = 0; i < 10; i++)
+    {
+        snprintf(path, sizeof(path), CONFIG_ESP_COREDUMP_UART_CORE_FILE_NAME".%d", i);
+        fd = open(path, O_RDONLY);
+        if (fd >= 0)
+            close(fd);
+        else
+            return path;
+    }
+
+    return NULL;
+}
+
+void esp_backtrace_user_print_entry_start(void)
+{
+    backtrace_fd = open(CONFIG_ESP_COREDUMP_UART_BACKTRACE_FILE_NAME".log", O_RDWR | O_CREAT | O_TRUNC);
+}
+
+void esp_backtrace_user_print_entry(uint32_t pc, uint32_t sp)
+{
+    if(backtrace_fd != -1){
+        char  log[32];
+        snprintf(log,sizeof(log),DRAM_STR("0x%08X:0x%08X "), pc,sp);
+        int ret = write(backtrace_fd, log, strlen(log));
+        if(ret == strlen(log))
+        {
+            fsync(backtrace_fd);
+        }
+    }
+}
+
+void esp_backtrace_user_print_entry_end(void)
+{
+    if(backtrace_fd != -1){
+        close(backtrace_fd);
+        backtrace_fd = -1;
+    }
+}
+#endif
 
 static void esp_core_dump_b64_encode(const uint8_t *src, uint32_t src_len, uint8_t *dst) {
     const static DRAM_ATTR char b64[] =
@@ -54,6 +133,119 @@ static void esp_core_dump_b64_encode(const uint8_t *src, uint32_t src_len, uint8
     dst[j++] = '\0';
 }
 
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+static esp_err_t esp_core_dump_partition_and_size_get(const esp_partition_t **partition,uint32_t* size)
+{
+    uint32_t core_size = 0;
+    const esp_partition_t *core_part = NULL;
+
+    /* Check the arguments, at least one should be provided. */
+    if (partition == NULL && size == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Find the partition that could potentially contain a (previous) core dump. */
+    core_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                         ESP_PARTITION_SUBTYPE_DATA_COREDUMP,
+                                         NULL);
+    if (core_part == NULL) {
+        ESP_COREDUMP_LOGE("No core dump partition found!");
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (core_part->size < sizeof(uint32_t)) {
+        ESP_COREDUMP_LOGE("Too small core dump partition!");
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    /* The partition has been found, get its first uint32_t value, which
+     * describes the core dump file size. */
+    esp_err_t err = esp_partition_read(core_part, 0, &core_size, sizeof(uint32_t));
+    if (err != ESP_OK) {
+        ESP_COREDUMP_LOGE("Failed to read core dump data size (%d)!", err);
+        return err;
+    }
+
+    /* Verify that the size read from the flash is not corrupted. */
+    if (core_size == 0xFFFFFFFF) {
+        ESP_COREDUMP_LOGD("Blank core dump partition!");
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    if ((core_size < sizeof(uint32_t)) || (core_size > core_part->size)) {
+        ESP_COREDUMP_LOGE("Incorrect size of core dump image: %d", core_size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    /* Return the values if needed. */
+    if (partition != NULL) {
+        *partition = core_part;
+    }
+
+    if (size != NULL) {
+        *size = core_size;
+    }
+
+    return ESP_OK;
+}
+
+static esp_err_t esp_core_dump_partition_get(const esp_partition_t **partition)
+{
+    const esp_partition_t *core_part = NULL;
+
+    /* Check the arguments, at least one should be provided. */
+    if (partition == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Find the partition that could potentially contain a (previous) core dump. */
+    core_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                         ESP_PARTITION_SUBTYPE_DATA_COREDUMP,
+                                         NULL);
+    if (core_part == NULL) {
+        ESP_COREDUMP_LOGE("No core dump partition found!");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /* Return the values if needed. */
+    if (partition != NULL) {
+        *partition = core_part;
+    }
+
+
+    return ESP_OK;
+}
+static esp_err_t esp_core_dump_flash_write_data(esp_partition_t *partition, uint8_t* data, uint32_t data_size)
+{
+    if(partition)
+    {
+        ESP_COREDUMP_FLASH_WRITE(partition->address + wr_flash_off, data,data_size);
+        wr_flash_off += data_size;
+        //+\r\n
+        ESP_COREDUMP_FLASH_WRITE(partition->address + wr_flash_off, "\r\n", strlen("\r\n"));
+        wr_flash_off += strlen("\r\n");
+        return ESP_OK;
+    }
+    return ESP_ERR_NOT_FOUND;
+}
+
+static esp_err_t esp_core_dump_flash_write_data_end(esp_partition_t *partition, uint8_t* data, uint32_t data_size)
+{
+    if(partition)
+    {
+        ESP_COREDUMP_FLASH_WRITE(partition->address + wr_flash_off, data, data_size);
+        wr_flash_off += data_size;
+        //+\r\n
+        ESP_COREDUMP_FLASH_WRITE(partition->address + wr_flash_off, "\r\n", strlen("\r\n"));
+        wr_flash_off += strlen("\r\n");
+        //+size
+        uint32_t size = wr_flash_off - sizeof(uint32_t);
+        ESP_COREDUMP_FLASH_WRITE(partition->address + 0, &size, sizeof(uint32_t));
+        return ESP_OK;
+    }
+    return ESP_ERR_NOT_FOUND;
+}
+#endif
+
 static esp_err_t esp_core_dump_uart_write_start(core_dump_write_data_t *priv)
 {
     esp_err_t err = ESP_OK;
@@ -69,6 +261,27 @@ static esp_err_t esp_core_dump_uart_write_prepare(core_dump_write_data_t *priv, 
 {
     ESP_COREDUMP_ASSERT(data_len != NULL);
     *data_len += esp_core_dump_checksum_size();
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+    const esp_partition_t *partition = 0;
+    uint32_t size = *data_len * 2;
+    uint32_t sec_num = 0;
+    wr_flash_off = sizeof(uint32_t);
+    if (esp_core_dump_partition_get(&partition) == ESP_OK) {
+        sec_num = size / SPI_FLASH_SEC_SIZE;
+        if (size % SPI_FLASH_SEC_SIZE) {
+            sec_num++;
+        }
+        ESP_COREDUMP_LOGI("Erase flash %d bytes @ 0x%x", sec_num * SPI_FLASH_SEC_SIZE, partition->address + 0);
+        ESP_COREDUMP_FLASH_ERASE(partition->address,sec_num * SPI_FLASH_SEC_SIZE);
+    }
+#endif
+#if CONFIG_ESP_COREDUMP_UART_TO_FILE
+    char * path = core_file_path();
+    if (path)
+    {
+        corefd = open(path, O_RDWR | O_CREAT | O_TRUNC);
+    }
+#endif
     return ESP_OK;
 }
 
@@ -78,18 +291,34 @@ static esp_err_t esp_core_dump_uart_write_end(core_dump_write_data_t *priv)
     char buf[64 + 4] = { 0 };
     core_dump_checksum_bytes cs_addr = NULL;
     core_dump_write_data_t *wr_data = (core_dump_write_data_t *)priv;
+    
+    #if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+    const esp_partition_t *partition = 0;
+    esp_core_dump_partition_get(&partition);
+    #endif
     if (wr_data) {
         size_t cs_len = esp_core_dump_checksum_finish(wr_data->checksum_ctx, &cs_addr);
         wr_data->off += cs_len;
         esp_core_dump_b64_encode((const uint8_t *)cs_addr, cs_len, (uint8_t*)&buf[0]);
         esp_rom_printf(DRAM_STR("%s\r\n"), buf);
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+        esp_core_dump_flash_write_data_end(partition,(uint8_t*)buf, strlen(buf));
+#endif
+#if CONFIG_ESP_COREDUMP_UART_TO_FILE
+        save_corefile((uint8_t*)buf, strlen(buf));
+#endif
     }
     esp_rom_printf(DRAM_STR("================= CORE DUMP END =================\r\n"));
 
     if (cs_addr) {
         esp_core_dump_print_checksum(DRAM_STR("Coredump checksum"), cs_addr);
     }
-
+#if CONFIG_ESP_COREDUMP_UART_TO_FILE
+    if(corefd != -1){
+        close(corefd);
+        corefd = -1;
+    }
+#endif
     return err;
 }
 
@@ -102,7 +331,10 @@ static esp_err_t esp_core_dump_uart_write_data(core_dump_write_data_t *priv, voi
     core_dump_write_data_t *wr_data = (core_dump_write_data_t *)priv;
 
     ESP_COREDUMP_ASSERT(data != NULL);
-
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+    const esp_partition_t *partition = 0;
+    esp_core_dump_partition_get(&partition);
+#endif
     while (addr < end) {
         size_t len = end - addr;
         if (len > 48) len = 48;
@@ -112,6 +344,12 @@ static esp_err_t esp_core_dump_uart_write_data(core_dump_write_data_t *priv, voi
         esp_core_dump_b64_encode((const uint8_t *)tmp, len, (uint8_t *)buf);
         addr += len;
         esp_rom_printf(DRAM_STR("%s\r\n"), buf);
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+        esp_core_dump_flash_write_data(partition,(uint8_t*)buf, strlen(buf));
+#endif
+#if CONFIG_ESP_COREDUMP_UART_TO_FILE
+        save_corefile((uint8_t*)buf, strlen(buf));
+#endif
     }
 
     if (wr_data) {
@@ -170,5 +408,38 @@ void esp_core_dump_to_uart(panic_info_t *info)
 void esp_core_dump_init(void)
 {
     ESP_COREDUMP_LOGI("Init core dump to UART");
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+    const esp_partition_t *partition = 0;
+    uint32_t size = 0;
+    if (esp_core_dump_partition_and_size_get(&partition, &size) == ESP_OK) {
+        ESP_COREDUMP_LOGI("Found core dump %d bytes in flash @ 0x%x", size, partition->address);
+    }
+#endif
 }
+
+
+#if CONFIG_ESP_COREDUMP_UART_TO_FLASH
+void esp_core_dump_to_printf(void)
+{
+    const esp_partition_t *partition = 0;
+    uint32_t size = 0;
+    esp_rom_printf(DRAM_STR("================= CORE DUMP START =================\r\n"));
+    if(esp_core_dump_partition_and_size_get(&partition, &size) == ESP_OK)
+    {
+        char buf[64 + 4] = { 0 };
+        uint32_t addr = sizeof(uint32_t);
+        uint32_t end = size + sizeof(uint32_t);
+        while (addr < end) {
+            size_t len = end - addr;
+            if (len > 48) len = 48;
+            /* Copy to stack to avoid alignment restrictions. */
+            ESP_COREDUMP_FLASH_READ(partition->address + addr, buf, len);
+            buf[len] = 0;
+            addr += len;
+            esp_rom_printf(DRAM_STR("%s"), buf);
+        }
+    }
+    esp_rom_printf(DRAM_STR("================= CORE DUMP END =================\r\n"));
+}
+#endif
 #endif

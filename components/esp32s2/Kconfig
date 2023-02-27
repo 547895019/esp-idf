@@ -142,7 +142,19 @@ menu "ESP32S2-specific"
             default 4194304 if SPIRAM_TYPE_ESPPSRAM32
             default 8388608 if SPIRAM_TYPE_ESPPSRAM64
             default 0
-
+            
+        config SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+            bool "Allow external memory as an argument to xTaskCreateStatic"
+            default n
+            help
+                Because some bits of the ESP32 code environment cannot be recompiled with the cache workaround,
+                normally tasks cannot be safely run with their stack residing in external memory; for this reason
+                xTaskCreate (and related task creaton functions) always allocate stack in internal memory and
+                xTaskCreateStatic will check if the memory passed to it is in internal memory. If you have a task that
+                needs a large amount of stack and does not call on ROM code in any way (no direct calls, but also no
+                Bluetooth/WiFi), you can try enable this to cause xTaskCreateStatic to allow tasks stack in external
+                memory.
+                
         menu "PSRAM clock and cs IO for ESP32S2"
             depends on ESP32S2_SPIRAM_SUPPORT
             config DEFAULT_PSRAM_CLK_IO

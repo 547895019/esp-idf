@@ -163,10 +163,10 @@ inline void esp_core_dump_write(panic_info_t *info, core_dump_write_config_t *wr
 #endif
 }
 
-void __attribute__((weak)) esp_core_dump_init(void)
-{
+//void __attribute__((weak)) esp_core_dump_init(void)
+//{
     /* do nothing by default */
-}
+//}
 
 /**
  * Common functions related to core dump generation.

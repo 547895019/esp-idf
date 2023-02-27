@@ -1456,7 +1456,11 @@ static void uart_free_driver_obj(uart_obj_t *uart_obj)
 
 static uart_obj_t *uart_alloc_driver_obj(int event_queue_size, int tx_buffer_size, int rx_buffer_size)
 {
+#if CONFIG_IDF_TARGET_ESP32
+    uart_obj_t *uart_obj = calloc(1, sizeof(uart_obj_t));
+#else
     uart_obj_t *uart_obj = heap_caps_calloc(1, sizeof(uart_obj_t), UART_MALLOC_CAPS);
+#endif
     if (!uart_obj) {
         return NULL;
     }

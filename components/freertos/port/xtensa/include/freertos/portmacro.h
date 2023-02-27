@@ -436,8 +436,12 @@ static inline void __attribute__((always_inline)) uxPortCompareSetExtram(volatil
 #define portTcbMemoryCaps               (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)
 #define portStackMemoryCaps             (MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)
 #define pvPortMallocTcbMem(size)        heap_caps_malloc(size, portTcbMemoryCaps)
-#define pvPortMallocStackMem(size)      heap_caps_malloc(size, portStackMemoryCaps)
 
+#if CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP
+#define pvPortMallocStackMem(size)      heap_caps_malloc_prefer(size, 2, MALLOC_CAP_DEFAULT|MALLOC_CAP_SPIRAM, portStackMemoryCaps)
+#else
+#define pvPortMallocStackMem(size)      heap_caps_malloc(size, portStackMemoryCaps)
+#endif
 // --------------------- Interrupts ------------------------
 
 /**

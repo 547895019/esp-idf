@@ -68,5 +68,7 @@ menu "Newlib"
 
             If you need 64-bit integer formatting support or C99 features, keep this
             option disabled.
-
+     config NEWLIB_WITH_MUSL
+        bool "Enable musl options for epoll"
+        default n
 endmenu # Newlib

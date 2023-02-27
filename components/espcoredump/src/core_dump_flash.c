@@ -238,7 +238,6 @@ static esp_err_t esp_core_dump_flash_write_prepare(core_dump_write_data_t *priv,
     if (err != ESP_OK) {
         ESP_COREDUMP_LOGE("Failed to erase flash (%d)!", err);
     }
-
     return err;
 }
 
@@ -313,7 +312,7 @@ void esp_core_dump_to_flash(panic_info_t *info)
 {
     static core_dump_write_config_t wr_cfg = { 0 };
     static core_dump_write_data_t wr_data = { 0 };
-
+    
     /* Check core dump partition configuration. */
     core_dump_crc_t crc = esp_core_dump_calc_flash_config_crc();
     if (s_core_flash_config.partition_config_crc != crc) {
@@ -394,7 +393,8 @@ esp_err_t esp_core_dump_image_check(void)
         const uint32_t toread = (size < COREDUMP_CACHE_SIZE) ? size : COREDUMP_CACHE_SIZE;
 
         /* Read the content of the flash. */
-        err = esp_partition_read(core_part, offset, wr_data.cached_data, toread);
+        //err = esp_partition_read(core_part, offset, wr_data.cached_data, toread);
+        err = spi_flash_read(core_part->address + offset, wr_data.cached_data, toread);
         if (err != ESP_OK) {
             ESP_COREDUMP_LOGE("Failed to read data from core dump (%d)!", err);
             return err;
@@ -413,7 +413,8 @@ esp_err_t esp_core_dump_image_check(void)
 
     /* Read the checksum from the flash and compare to the one just
      * calculated. */
-    err = esp_partition_read(core_part, total_size - checksum_size, checksum_read, checksum_size);
+   //err = esp_partition_read(core_part, total_size - checksum_size, checksum_read, checksum_size);
+   err = spi_flash_read(core_part->address + (total_size - checksum_size),checksum_read, checksum_size);
     if (err != ESP_OK) {
         ESP_COREDUMP_LOGE("Failed to read checksum from core dump (%d)!", err);
         return err;
@@ -455,13 +456,14 @@ esp_err_t esp_core_dump_image_erase(void)
     }
 
     esp_err_t err = ESP_OK;
-    err = esp_partition_erase_range(core_part, 0, core_part->size);
+    //err = esp_partition_erase_range(core_part, 0, core_part->size);
+    err = spi_flash_erase_range(core_part->address + 0,core_part->size);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to erase core dump partition (%d)!", err);
         return err;
     }
-
-    err = esp_partition_write(core_part, 0, helper, sizeof(helper));
+    err = spi_flash_write(core_part->address + 0, helper, sizeof(helper));
+    //err = esp_partition_write(core_part, 0, helper, sizeof(helper));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write core dump partition size (%d)!", err);
     }
@@ -494,7 +496,8 @@ static esp_err_t esp_core_dump_partition_and_size_get(const esp_partition_t **pa
 
     /* The partition has been found, get its first uint32_t value, which
      * describes the core dump file size. */
-    esp_err_t err = esp_partition_read(core_part, 0, &core_size, sizeof(uint32_t));
+   // esp_err_t err = esp_partition_read(core_part, 0, &core_size, sizeof(uint32_t));
+    esp_err_t err = spi_flash_read(core_part->address + 0, &core_size, sizeof(uint32_t));
     if (err != ESP_OK) {
         ESP_COREDUMP_LOGE("Failed to read core dump data size (%d)!", err);
         return err;

@@ -750,6 +750,10 @@ static IRAM_ATTR bool is_xmc_chip_strict(uint32_t rdid)
         if (cpid >= 0x15 && cpid <= 0x16) {
             matched =  true;
         }
+    } else if (mfid == 0x70) {
+        if (cpid >= 0x17 && cpid <= 0x20) {
+            matched = true;
+        }
     }
     return matched;
 }
@@ -771,7 +775,7 @@ esp_err_t IRAM_ATTR bootloader_flash_xmc_startup(void)
         return ESP_OK;
     }
 
-    BOOTLOADER_FLASH_LOG(I, "XM25QHxxC startup flow");
+    BOOTLOADER_FLASH_LOG(I, "XM25QHxxx startup flow");
     // Enter DPD
     bootloader_execute_flash_command(0xB9, 0, 0, 0);
     // Enter UDPD
@@ -786,6 +790,7 @@ esp_err_t IRAM_ATTR bootloader_flash_xmc_startup(void)
     // Read flash ID and check again
     g_rom_flashchip.device_id = bootloader_read_flash_id();
     if (!is_xmc_chip_strict(g_rom_flashchip.device_id)) {
+        BOOTLOADER_FLASH_LOG(E, "XMC chip detected (%08X) while support disabled.", g_rom_flashchip.device_id);
         BOOTLOADER_FLASH_LOG(E, "XMC flash startup fail");
         return ESP_FAIL;
     }

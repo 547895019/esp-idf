@@ -69,7 +69,7 @@ inline static bool IRAM_ATTR esp_ptr_byte_accessible(const void *p)
     r |= (ip >= SOC_RTC_DRAM_LOW && ip < SOC_RTC_DRAM_HIGH);
 #endif
 #if CONFIG_SPIRAM
-#if CONFIG_SPIRAM_SIZE != -1 // Fixed size, can be more accurate
+#if CONFIG_SPIRAM_SIZE != -1 && !CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY// Fixed size, can be more accurate
     r |= (ip >= SOC_EXTRAM_DATA_LOW && ip < (SOC_EXTRAM_DATA_LOW + CONFIG_SPIRAM_SIZE));
 #else
     r |= (ip >= SOC_EXTRAM_DATA_LOW && ip < (SOC_EXTRAM_DATA_HIGH));

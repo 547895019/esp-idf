@@ -1096,6 +1096,7 @@ static int linenoiseDumb(char* buf, size_t buflen, const char* prompt) {
     while (count < buflen) {
         int c = fgetc(stdin);
         if (c == '\n') {
+            fputc('\n', stdout);
             break;
         } else if (c >= 0x1c && c <= 0x1f){
             continue; /* consume arrow keys */

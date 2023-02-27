@@ -14,7 +14,6 @@ menu "Core dump"
 
         config ESP_COREDUMP_ENABLE_TO_FLASH
             bool "Flash"
-            depends on !SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
             select FREERTOS_ENABLE_TASK_SNAPSHOT
             select ESP_COREDUMP_ENABLE
         config ESP_COREDUMP_ENABLE_TO_UART
@@ -70,7 +69,25 @@ menu "Core dump"
         default 64
         help
             Maximum number of tasks snapshots in core dump.
-
+            
+    config ESP_COREDUMP_UART_TO_FLASH
+        bool "Save to flash after print to UART"
+        depends on ESP_COREDUMP_ENABLE_TO_UART
+        default n
+        
+    config ESP_COREDUMP_UART_TO_FILE
+        bool "Save to file after print to UART"
+        depends on ESP_COREDUMP_ENABLE_TO_UART
+        default n
+    config ESP_COREDUMP_UART_CORE_FILE_NAME
+        string "The core file path."
+        depends on ESP_COREDUMP_UART_TO_FILE
+        default "/spiffs/core"
+    config ESP_COREDUMP_UART_BACKTRACE_FILE_NAME
+        string "The backtrace file path."
+        depends on ESP_COREDUMP_UART_TO_FILE
+        default "/spiffs/backtrace"
+        
     config ESP_COREDUMP_UART_DELAY
         int "Delay before print to UART"
         depends on ESP_COREDUMP_ENABLE_TO_UART

@@ -249,6 +249,8 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
         if (pthread_cfg->pin_to_core >= 0 && pthread_cfg->pin_to_core < portNUM_PROCESSORS) {
             core_id = pthread_cfg->pin_to_core;
+        }else{
+            core_id = tskNO_AFFINITY;
         }
 
         task_arg->cfg = *pthread_cfg;
@@ -271,13 +273,14 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
     task_arg->func = start_routine;
     task_arg->arg = arg;
     pthread->task_arg = task_arg;
+
     BaseType_t res = xTaskCreatePinnedToCore(&pthread_task_func,
                                              task_name,
                                              // stack_size is in bytes. This transformation ensures that the units are
                                              // transformed to the units used in FreeRTOS.
                                              // Note: float division of ceil(m / n) ==
                                              //       integer division of (m + n - 1) / n
-                                             (stack_size + sizeof(StackType_t) - 1) / sizeof(StackType_t),
+                                            (stack_size + sizeof(StackType_t) - 1) / sizeof(StackType_t),
                                              task_arg,
                                              prio,
                                              &xHandle,
@@ -293,6 +296,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
             return EAGAIN;
         }
     }
+
     pthread->handle = xHandle;
 
     if (xSemaphoreTake(s_threads_mux, portMAX_DELAY) != pdTRUE) {

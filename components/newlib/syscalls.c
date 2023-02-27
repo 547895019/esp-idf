@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <reent.h>
 #include <sys/fcntl.h>
+#include <sys/utsname.h>
 #include "sdkconfig.h"
 #include "esp_rom_uart.h"
 
@@ -158,4 +159,12 @@ int fcntl(int fd, int cmd, ...)
  */
 void newlib_include_syscalls_impl(void)
 {
+}
+
+int uname (struct utsname *name){
+    return 0;
+}
+
+int getentropy(void *buffer, size_t length){
+    return 0;
 }

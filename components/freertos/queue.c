@@ -707,7 +707,11 @@ static void prvInitialiseNewQueue( const UBaseType_t uxQueueLength,
 /*-----------------------------------------------------------*/
 
 #if ( configUSE_RECURSIVE_MUTEXES == 1 )
-
+    BaseType_t xQueueTakeMutexRecursiveCount( QueueHandle_t xMutex)
+    {
+        Queue_t * const pxMutex = ( Queue_t * ) xMutex;
+        return pxMutex->u.xSemaphore.uxRecursiveCallCount;
+    }
     BaseType_t xQueueTakeMutexRecursive( QueueHandle_t xMutex,
                                          TickType_t xTicksToWait )
     {

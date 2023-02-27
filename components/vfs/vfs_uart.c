@@ -242,34 +242,38 @@ static ssize_t uart_read(int fd, void* data, size_t size)
     _lock_acquire_recursive(&s_ctx[fd]->read_lock);
     while (received < size) {
         int c = uart_read_char(fd);
-        if (c == '\r') {
-            if (s_ctx[fd]->rx_mode == ESP_LINE_ENDINGS_CR) {
-                c = '\n';
-            } else if (s_ctx[fd]->rx_mode == ESP_LINE_ENDINGS_CRLF) {
-                /* look ahead */
-                int c2 = uart_read_char(fd);
-                if (c2 == NONE) {
-                    /* could not look ahead, put the current character back */
-                    uart_return_char(fd, c);
-                    break;
-                }
-                if (c2 == '\n') {
-                    /* this was \r\n sequence. discard \r, return \n */
+        if(s_ctx[fd]->rx_mode > ESP_LINE_ENDINGS_NONE){
+            if (c == '\r') {
+                if (s_ctx[fd]->rx_mode == ESP_LINE_ENDINGS_CR) {
                     c = '\n';
-                } else {
-                    /* \r followed by something else. put the second char back,
-                     * it will be processed on next iteration. return \r now.
-                     */
-                    uart_return_char(fd, c2);
+                } else if (s_ctx[fd]->rx_mode == ESP_LINE_ENDINGS_CRLF) {
+                    /* look ahead */
+                    int c2 = uart_read_char(fd);
+                    if (c2 == NONE) {
+                        /* could not look ahead, put the current character back */
+                        uart_return_char(fd, c);
+                        break;
+                    }
+                    if (c2 == '\n') {
+                        /* this was \r\n sequence. discard \r, return \n */
+                        c = '\n';
+                    } else {
+                        /* \r followed by something else. put the second char back,
+                         * it will be processed on next iteration. return \r now.
+                         */
+                        uart_return_char(fd, c2);
+                    }
                 }
+            } else if (c == NONE) {
+                break;
             }
-        } else if (c == NONE) {
-            break;
         }
         data_c[received] = (char) c;
         ++received;
-        if (c == '\n') {
-            break;
+        if(s_ctx[fd]->rx_mode > ESP_LINE_ENDINGS_NONE){
+            if (c == '\n') {
+                break;
+            }
         }
     }
     _lock_release_recursive(&s_ctx[fd]->read_lock);

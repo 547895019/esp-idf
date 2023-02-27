@@ -10,6 +10,7 @@ set(srcs
     "heap.c"
     "locks.c"
     "poll.c"
+    "epoll.c"
     "pthread.c"
     "random.c"
     "reent_init.c"

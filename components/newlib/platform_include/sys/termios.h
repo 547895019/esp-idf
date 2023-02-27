@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include "sdkconfig.h"
 
 #ifdef CONFIG_VFS_SUPPORT_TERMIOS

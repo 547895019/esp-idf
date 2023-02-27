@@ -363,6 +363,8 @@ _exit:
     return ret;
 }
 
+extern esp_err_t esp_console_register_nvs_command(void);
+
 static esp_err_t esp_console_common_init(size_t max_cmdline_length, esp_console_repl_com_t *repl_com)
 {
     esp_err_t ret = ESP_OK;
@@ -386,6 +388,11 @@ static esp_err_t esp_console_common_init(size_t max_cmdline_length, esp_console_
     }
 
     ret = esp_console_register_help_command();
+    if (ret != ESP_OK) {
+        goto _exit;
+    }
+    
+    ret = esp_console_register_nvs_command();
     if (ret != ESP_OK) {
         goto _exit;
     }

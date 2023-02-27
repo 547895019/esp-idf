@@ -166,7 +166,7 @@ lwip_hook_tcp_isn(const ip_addr_t *local_ip, u16_t local_port,
    * even with SPIRAM enabled case and ESP32 revision < 3, using ROM
    * APIs should not create any issues.
    */
-#if CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+#if CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY && !CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP
   assert(!esp_ptr_external_ram(esp_cpu_get_sp()));
 #endif
 
