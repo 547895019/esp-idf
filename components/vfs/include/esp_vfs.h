@@ -248,6 +248,10 @@ typedef struct
     /** get_socket_select_semaphore returns semaphore allocated in the socket driver; set only for the socket driver */
     esp_err_t (*end_select)(void *end_select_args);
 #endif // CONFIG_VFS_SUPPORT_SELECT
+    union {
+        const char* (*get_path_by_fd_p)(void* ctx, int fd);
+        const char* (*get_path_by_fd)(int fd);
+    };
 } esp_vfs_t;
 
 /**

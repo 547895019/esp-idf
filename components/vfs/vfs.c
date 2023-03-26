@@ -1225,6 +1225,38 @@ int tcsendbreak(int fd, int duration)
 }
 #endif // CONFIG_VFS_SUPPORT_TERMIOS
 
+int openat(int fd, const char *path, int flags, ...)
+{
+    int ret;
+    char *full_path;
+    const char *basic_path;
+    const vfs_entry_t* vfs = get_vfs_for_fd(fd);
+    const int local_fd = get_local_fd(vfs, fd);
+    struct _reent* r = __getreent();
+
+    if (vfs == NULL || local_fd < 0) {
+        __errno_r(r) = EBADF;
+        return -1;
+    }
+
+    CHECK_AND_CALL(basic_path, r, vfs, get_path_by_fd, local_fd);
+    if (!basic_path) {
+        __errno_r(r) = EBADF;
+        return -1;
+    }
+
+    ret = asprintf(&full_path, "%s%s%s", vfs->path_prefix, basic_path, path);
+    if (ret < 0) {
+        __errno_r(r) = ENOMEM;
+        return -1;
+    }
+
+    ret = open(full_path, flags, 0);
+
+    free(full_path);
+
+    return ret;
+}
 
 /* Create aliases for newlib syscalls
 

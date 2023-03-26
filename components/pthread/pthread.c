@@ -37,6 +37,9 @@ typedef struct esp_pthread_entry {
     bool                        detached;       ///< True if pthread is detached
     void                       *retval;         ///< Value supplied to calling thread during join
     void                       *task_arg;       ///< Task arguments
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+    StaticTask_t               *task_buffer;    ///< FreeRTOS static task buffer
+#endif
 } esp_pthread_t;
 
 /** pthread wrapper task arg */
@@ -120,6 +123,11 @@ static esp_pthread_t *pthread_find(TaskHandle_t task_handle)
 static void pthread_delete(esp_pthread_t *pthread)
 {
     SLIST_REMOVE(&s_threads_list, pthread, esp_pthread_entry, list_node);
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+    if (pthread->task_buffer) {
+        vPortFree(pthread->task_buffer);
+    }
+#endif
     free(pthread);
 }
 
@@ -256,10 +264,12 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
         task_arg->cfg = *pthread_cfg;
     }
 
+    void *stack_addr = NULL;
     if (attr) {
         /* Overwrite attributes */
         stack_size = attr->stacksize;
-
+        stack_addr = attr->stackaddr;
+        
         switch (attr->detachstate) {
         case PTHREAD_CREATE_DETACHED:
             pthread->detached = true;
@@ -268,12 +278,55 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
         default:
             pthread->detached = false;
         }
+
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+        if (stack_addr) {
+            pthread->task_buffer = pvPortMalloc(sizeof(StaticTask_t));
+            if (!pthread->task_buffer) {
+                ESP_LOGE(TAG, "Failed to allocate freertos task buffer!");
+                free(task_arg);
+                return ENOMEM;
+            }
+        }
+#else
+        (void)stack_addr;
+#endif
     }
 
     task_arg->func = start_routine;
     task_arg->arg = arg;
     pthread->task_arg = task_arg;
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+    BaseType_t res;
 
+    if (!stack_addr) {
+        res = xTaskCreatePinnedToCore(&pthread_task_func,
+                                      task_name,
+                                      // stack_size is in bytes. This transformation ensures that the units are
+                                      // transformed to the units used in FreeRTOS.
+                                      // Note: float division of ceil(m / n) ==
+                                      // integer division of (m + n - 1) / n
+                                      (stack_size + sizeof(StackType_t) - 1) / sizeof(StackType_t),
+                                      task_arg,
+                                      prio,
+                                      &xHandle,
+                                      core_id);
+    } else {
+        xHandle = xTaskCreateStaticPinnedToCore(&pthread_task_func,
+                                                task_name,
+                                                (stack_size + sizeof(StackType_t) - 1) / sizeof(StackType_t),
+                                                task_arg,
+                                                prio,
+                                                stack_addr,
+                                                pthread->task_buffer,
+                                                core_id);
+        if (xHandle) {
+            res = pdPASS;
+        } else {
+            res = pdFAIL;
+        }
+    }
+#else
     BaseType_t res = xTaskCreatePinnedToCore(&pthread_task_func,
                                              task_name,
                                              // stack_size is in bytes. This transformation ensures that the units are
@@ -285,9 +338,14 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                                              prio,
                                              &xHandle,
                                              core_id);
-
+#endif
     if (res != pdPASS) {
         ESP_LOGE(TAG, "Failed to create task!");
+#ifdef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+        if (pthread->task_buffer) {
+            vPortFree(pthread->task_buffer);
+        }
+#endif
         free(pthread);
         free(task_arg);
         if (res == errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY) {

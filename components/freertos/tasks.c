@@ -4578,7 +4578,9 @@ BaseType_t xTaskGetAffinity( TaskHandle_t xTask )
                 {
                     /* Neither the stack nor the TCB were allocated dynamically, so
                      * nothing needs to be freed. */
+#ifndef CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
                     configASSERT( pxTCB->ucStaticallyAllocated == tskSTATICALLY_ALLOCATED_STACK_AND_TCB );
+#endif
                     mtCOVERAGE_TEST_MARKER();
                 }
             }
