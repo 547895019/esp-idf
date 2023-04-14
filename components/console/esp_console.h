@@ -12,6 +12,7 @@ extern "C" {
 #include <stddef.h>
 #include "sdkconfig.h"
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
 
 // Forward declaration. Definition in linenoise/linenoise.h.
 typedef struct linenoiseCompletions linenoiseCompletions;

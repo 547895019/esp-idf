@@ -152,10 +152,10 @@ static ssize_t usb_serial_jtag_write(int fd, const void * data, size_t size)
             }
         }
         s_ctx.tx_func(fd, c);
-        if (c == '\n') {
+        //if (c == '\n') {
             //Make sure line doesn't linger in fifo
             usb_serial_jtag_ll_txfifo_flush();
-        }
+        //}
     }
     _lock_release_recursive(&s_ctx.write_lock);
     return size;
@@ -191,34 +191,38 @@ static ssize_t usb_serial_jtag_read(int fd, void* data, size_t size)
     _lock_acquire_recursive(&s_ctx.read_lock);
     while (received < size) {
         int c = usb_serial_jtag_read_char(fd);
-        if (c == '\r') {
-            if (s_ctx.rx_mode == ESP_LINE_ENDINGS_CR) {
-                c = '\n';
-            } else if (s_ctx.rx_mode == ESP_LINE_ENDINGS_CRLF) {
-                /* look ahead */
-                int c2 = usb_serial_jtag_read_char(fd);
-                if (c2 == NONE) {
-                    /* could not look ahead, put the current character back */
-                    usb_serial_jtag_return_char(fd, c);
-                    break;
-                }
-                if (c2 == '\n') {
-                    /* this was \r\n sequence. discard \r, return \n */
+        if(s_ctx.rx_mode > ESP_LINE_ENDINGS_NONE){
+            if (c == '\r') {
+                if (s_ctx.rx_mode == ESP_LINE_ENDINGS_CR) {
                     c = '\n';
-                } else {
-                    /* \r followed by something else. put the second char back,
-                     * it will be processed on next iteration. return \r now.
-                     */
-                    usb_serial_jtag_return_char(fd, c2);
+                } else if (s_ctx.rx_mode == ESP_LINE_ENDINGS_CRLF) {
+                    /* look ahead */
+                    int c2 = usb_serial_jtag_read_char(fd);
+                    if (c2 == NONE) {
+                        /* could not look ahead, put the current character back */
+                        usb_serial_jtag_return_char(fd, c);
+                        break;
+                    }
+                    if (c2 == '\n') {
+                        /* this was \r\n sequence. discard \r, return \n */
+                        c = '\n';
+                    } else {
+                        /* \r followed by something else. put the second char back,
+                         * it will be processed on next iteration. return \r now.
+                         */
+                        usb_serial_jtag_return_char(fd, c2);
+                    }
                 }
+            } else if (c == NONE) {
+                break;
             }
-        } else if (c == NONE) {
-            break;
         }
         data_c[received] = (char) c;
         ++received;
-        if (c == '\n') {
-            break;
+        if(s_ctx.rx_mode > ESP_LINE_ENDINGS_NONE){
+            if (c == '\n') {
+                break;
+            }
         }
     }
     _lock_release_recursive(&s_ctx.read_lock);
